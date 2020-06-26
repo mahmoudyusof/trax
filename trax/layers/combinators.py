@@ -90,12 +90,13 @@ class Serial(base.Layer):
     stack = input_signature
     for sublayer in self.sublayers:
       inputs = _inputs_from_stack(sublayer, stack)
-      weights_or_empty, state = sublayer.init(inputs, use_cache=True)
+      weights_or_cache_marker, state_or_cache_marker = (
+          sublayer.init(inputs, use_cache=True))
       outputs, _ = sublayer._forward_abstract(inputs)
       stack = _outputs_onto_stack(sublayer, outputs, stack)
 
-      weights.append(weights_or_empty)
-      states.append(state)
+      weights.append(weights_or_cache_marker)
+      states.append(state_or_cache_marker)
     self._state = states
     self._weights = weights
   # pylint: enable=protected-access
@@ -244,7 +245,7 @@ class Parallel(base.Layer):
   @base.Layer.weights.setter
   def weights(self, weights):
     """Recursively sets weights on this layer and all sublayers."""
-    if weights == base.EMPTY_WEIGHTS:
+    if weights == base.GET_WEIGHTS_FROM_CACHE:
       return
     self._weights = weights
     assert len(weights) == self._n_layers
@@ -254,6 +255,8 @@ class Parallel(base.Layer):
   @base.Layer.state.setter
   def state(self, state):
     """Recursively sets non-param state on this layer and all sublayers."""
+    if state == base.GET_STATE_FROM_CACHE:
+      return
     self._state = state
     assert len(state) == self._n_layers
     for layer, sublayer_state in zip(self.sublayers, state):
